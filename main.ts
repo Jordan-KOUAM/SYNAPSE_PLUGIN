@@ -1,4 +1,7 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian';
+import { SQLiteConfig, DatabaseConfig } from './src/core/sqlite/config';
+import { Repository } from './src/core/data/repository';
+import { SearchModal, RelationshipView } from './src/ui/components';
 
 // Remember to rename these classes and interfaces!
 
@@ -10,11 +13,53 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
 
-export default class MyPlugin extends Plugin {
+export default class SynapsePlugin extends Plugin {
+	private db: SQLiteConfig;
+	private repository: Repository;
 	settings: MyPluginSettings;
 
 	async onload() {
 		await this.loadSettings();
+
+		this.db = SQLiteConfig.getInstance();
+		this.repository = new Repository();
+
+		// Initialize database
+		await this.initializeDatabase();
+
+		// Register views
+		this.registerView(
+			'relationship-view',
+			(leaf: WorkspaceLeaf) => new RelationshipView(leaf)
+		);
+
+		// Add commands
+		this.addCommand({
+			id: 'open-search',
+			name: 'Open Search',
+			callback: () => {
+				new SearchModal(this.app, (note) => {
+					// Handle note selection
+					console.log('Selected note:', note);
+				}).open();
+			}
+		});
+
+		// Add ribbon icon
+		this.addRibbonIcon('search', 'Synapse Search', () => {
+			new SearchModal(this.app, (note) => {
+				// Handle note selection
+				console.log('Selected note:', note);
+			}).open();
+		});
+
+		// Register event handlers
+		this.registerEvent(
+			this.app.workspace.on('file-open', () => {
+				// Handle file open
+				console.log('File opened');
+			})
+		);
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
@@ -78,8 +123,61 @@ export default class MyPlugin extends Plugin {
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	onunload() {
+	private async initializeDatabase() {
+		const config: DatabaseConfig = {
+			dbPath: this.app.vault.configDir + '/synapse.db',
+			pageSize: 4096,
+			cacheSize: 5
+		};
 
+		try {
+			await this.db.initialize(config);
+			await this.createTables();
+		} catch (error) {
+			console.error('Failed to initialize database:', error);
+		}
+	}
+
+	private async createTables() {
+		const tables = [
+			`CREATE TABLE IF NOT EXISTS notes (
+				id TEXT PRIMARY KEY,
+				title TEXT NOT NULL,
+				content TEXT,
+				created INTEGER NOT NULL,
+				modified INTEGER NOT NULL,
+				tags TEXT
+			)`,
+			`CREATE TABLE IF NOT EXISTS relationships (
+				id TEXT PRIMARY KEY,
+				source_id TEXT NOT NULL,
+				target_id TEXT NOT NULL,
+				type TEXT NOT NULL,
+				metadata TEXT,
+				FOREIGN KEY (source_id) REFERENCES notes(id),
+				FOREIGN KEY (target_id) REFERENCES notes(id)
+			)`,
+			`CREATE TABLE IF NOT EXISTS tags (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL UNIQUE,
+				color TEXT,
+				description TEXT
+			)`,
+			`CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+				title,
+				content,
+				content='notes',
+				content_rowid='id'
+			)`
+		];
+
+		for (const sql of tables) {
+			await this.db.exec(sql);
+		}
+	}
+
+	onunload() {
+		console.log('Unloading Synapse plugin');
 	}
 
 	async loadSettings() {
@@ -108,9 +206,9 @@ class SampleModal extends Modal {
 }
 
 class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: SynapsePlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: SynapsePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
