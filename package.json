@@ -1,0 +1,39 @@
+{
+	"name": "synapse-plugin",
+	"version": "1.0.0",
+	"description": "Advanced database and knowledge management system for Obsidian",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/copy-to-vault.js",
+		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"test": "jest",
+		"lint": "eslint . --ext .ts",
+		"copy-to-vault": "node scripts/copy-to-vault.js"
+	},
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"database",
+		"knowledge-management"
+	],
+	"author": "Jordan-KOUAM",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^16.11.6",
+		"@types/jest": "^27.0.3",
+		"@typescript-eslint/eslint-plugin": "5.29.0",
+		"@typescript-eslint/parser": "5.29.0",
+		"builtin-modules": "3.3.0",
+		"esbuild": "0.17.3",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "4.7.4",
+		"jest": "^27.3.1",
+		"ts-jest": "^27.0.7"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Jordan-KOUAM/synapse-plugin.git"
+	}
+}
